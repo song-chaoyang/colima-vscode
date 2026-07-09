@@ -2,7 +2,7 @@
   "name": "colima",
   "displayName": "Colima",
   "description": "Manage Colima container runtimes from VS Code — start/stop profiles, manage containers, Kubernetes, AI models, attach to VM, and more. Works with VS Code, Cursor, Trae, and other VS Code-based editors. Open source: https://github.com/song-chaoyang/colima-vscode",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "song-chaoyang",
   "license": "MIT",
   "repository": {
