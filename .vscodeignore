@@ -1,0 +1,17 @@
+.vscode/**
+.vscode-test/**
+src/**
+node_modules/**
+.gitignore
+.eslintrc.json
+tsconfig.json
+esbuild.mjs
+**/*.map
+**/*.ts
+.github/**
+.codely-cli/**
+.codely/**
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+package-lock.json
+**/*.vsix

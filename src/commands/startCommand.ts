@@ -1,0 +1,134 @@
+import * as vscode from 'vscode';
+import type { ColimaClient } from '../colima/colimaClient';
+import type { StartOptions } from '../types';
+import { PRESETS } from '../constants';
+import { t } from '../i18n';
+import { handleError, withProgress } from '../utils/errorHandler';
+import type { StartWizard } from '../webview/startWizard';
+
+export function registerStartCommands(
+  client: ColimaClient,
+  startWizard: StartWizard,
+  refreshCallback: () => void,
+): vscode.Disposable[] {
+  return [
+    vscode.commands.registerCommand('colima.start', async (args?: { profile?: string }) => {
+      startWizard.show(args?.profile);
+    }),
+
+    vscode.commands.registerCommand('colima.start.quick', async () => {
+      await startWithPreset(client, PRESETS.quick, t('preset.quick'), refreshCallback);
+    }),
+
+    vscode.commands.registerCommand('colima.start.preset.dev', async () => {
+      await startWithPreset(client, PRESETS.dev, t('preset.dev'), refreshCallback);
+    }),
+
+    vscode.commands.registerCommand('colima.start.preset.k8s', async () => {
+      await startWithPreset(client, PRESETS.k8s, t('preset.k8s'), refreshCallback);
+    }),
+
+    vscode.commands.registerCommand('colima.start.preset.containerd', async () => {
+      await startWithPreset(client, PRESETS.containerd, t('preset.containerd'), refreshCallback);
+    }),
+
+    vscode.commands.registerCommand('colima.start.preset.ai', async () => {
+      await startWithPreset(client, PRESETS.ai, t('preset.ai'), refreshCallback);
+    }),
+  ];
+}
+
+async function startWithPreset(
+  client: ColimaClient,
+  preset: { cpu: number; memory: number; disk: number; runtime: string; kubernetes?: boolean; vmType?: string },
+  label: string,
+  refreshCallback: () => void,
+): Promise<void> {
+  try {
+    const options: StartOptions = {
+      cpu: preset.cpu,
+      memory: preset.memory,
+      disk: preset.disk,
+      runtime: preset.runtime as StartOptions['runtime'],
+      kubernetes: preset.kubernetes ?? false,
+      vmType: preset.vmType as StartOptions['vmType'],
+    };
+
+    await withProgress(`${t('progress.starting')} (${label})...`, async (report) => {
+      report('Starting VM...');
+      await client.start(options, (output) => {
+        const lines = output.split('\n').filter((l) => l.trim());
+        if (lines.length > 0) {
+          // Extract useful info from colima's log lines
+          const lastLine = lines[lines.length - 1].trim();
+          if (lastLine.includes('level=')) {
+            const msgMatch = lastLine.match(/msg="([^"]+)"/);
+            if (msgMatch) report(msgMatch[1]);
+          } else {
+            report(lastLine);
+          }
+        }
+      });
+      report(t('progress.done'));
+    });
+
+    void vscode.window.showInformationMessage(`${t('notify.started')} (${label})`);
+    refreshCallback();
+  } catch (e) {
+    handleError(e, `${t('notify.startFailed')} (${label})`);
+  }
+}
+
+export async function startProfile(
+  client: ColimaClient,
+  profileName: string,
+  refreshCallback: () => void,
+): Promise<void> {
+  try {
+    await withProgress(`${t('progress.starting')} "${profileName}"...`, async (report) => {
+      await client.start({ profile: profileName }, (output) => {
+        const lines = output.split('\n').filter((l) => l.trim());
+        if (lines.length > 0) {
+          const lastLine = lines[lines.length - 1].trim();
+          if (lastLine.includes('level=')) {
+            const msgMatch = lastLine.match(/msg="([^"]+)"/);
+            if (msgMatch) report(msgMatch[1]);
+          } else {
+            report(lastLine);
+          }
+        }
+      });
+    });
+    void vscode.window.showInformationMessage(`Colima: ${profileName} ${t('status.running').toLowerCase()}`);
+    refreshCallback();
+  } catch (e) {
+    handleError(e, `${t('notify.startFailed')} "${profileName}"`);
+  }
+}
+
+export async function startWithOptions(
+  client: ColimaClient,
+  options: StartOptions,
+  refreshCallback: () => void,
+): Promise<void> {
+  try {
+    await withProgress(t('progress.starting'), async (report) => {
+      await client.start(options, (output) => {
+        const lines = output.split('\n').filter((l) => l.trim());
+        if (lines.length > 0) {
+          const lastLine = lines[lines.length - 1].trim();
+          if (lastLine.includes('level=')) {
+            const msgMatch = lastLine.match(/msg="([^"]+)"/);
+            if (msgMatch) report(msgMatch[1]);
+          } else {
+            report(lastLine);
+          }
+        }
+      });
+    });
+    void vscode.window.showInformationMessage(t('notify.started'));
+    refreshCallback();
+  } catch (e) {
+    handleError(e, t('notify.startFailed'));
+  }
+}

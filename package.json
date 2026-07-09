@@ -1,0 +1,514 @@
+{
+  "name": "colima",
+  "displayName": "Colima",
+  "description": "Manage Colima container runtimes from VS Code — start/stop profiles, manage containers, Kubernetes, AI models, attach to VM, and more. Works with VS Code, Cursor, Trae, and other VS Code-based editors. Open source: https://github.com/song-chaoyang/colima-vscode",
+  "version": "0.1.0",
+  "publisher": "song-chaoyang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/song-chaoyang/colima-vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/song-chaoyang/colima-vscode/issues"
+  },
+  "homepage": "https://github.com/song-chaoyang/colima-vscode",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other",
+    "Azure",
+    "Debuggers"
+  ],
+  "keywords": [
+    "colima",
+    "docker",
+    "container",
+    "kubernetes",
+    "containerd",
+    "lima",
+    "vm",
+    "container runtime"
+  ],
+  "icon": "resources/icons/colima-logo.png",
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "colima",
+          "title": "Colima",
+          "icon": "resources/icons/colima-sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "colima": [
+        {
+          "id": "colima.profiles",
+          "name": "Profiles"
+        },
+        {
+          "id": "colima.containers",
+          "name": "Containers"
+        },
+        {
+          "id": "colima.kubernetes",
+          "name": "Kubernetes"
+        },
+        {
+          "id": "colima.models",
+          "name": "AI Models"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "colima.profiles",
+        "contents": "Colima is not running.\n[Start Colima](command:colima.start)\n[Quick Start](command:colima.start.quick)\n[Install Colima](command:colima.install)\nTo learn more, [read the docs](https://colima.run/docs/).",
+        "when": "!colima.installed"
+      },
+      {
+        "view": "colima.profiles",
+        "contents": "Colima is not running.\n[Start Colima](command:colima.start)\n[Quick Start](command:colima.start.quick)\nTo learn more, [read the docs](https://colima.run/docs/).",
+        "when": "colima.installed"
+      },
+      {
+        "view": "colima.containers",
+        "contents": "No containers running.\n[Start Colima](command:colima.start.quick)"
+      },
+      {
+        "view": "colima.kubernetes",
+        "contents": "Kubernetes is not enabled.\n[Start with Kubernetes](command:colima.start.preset.k8s)"
+      },
+      {
+        "view": "colima.models",
+        "contents": "No AI models available.\n[Setup Models](command:colima.model.setup)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "colima.profile.create",
+          "when": "view == colima.profiles",
+          "group": "navigation"
+        },
+        {
+          "command": "colima.refresh",
+          "when": "view == colima.profiles",
+          "group": "navigation"
+        },
+        {
+          "command": "colima.refresh",
+          "when": "view == colima.containers",
+          "group": "navigation"
+        },
+        {
+          "command": "colima.refresh",
+          "when": "view == colima.kubernetes",
+          "group": "navigation"
+        },
+        {
+          "command": "colima.model.pull",
+          "when": "view == colima.models",
+          "group": "navigation"
+        },
+        {
+          "command": "colima.refresh",
+          "when": "view == colima.models",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "colima.profile.start",
+          "when": "view == colima.profiles && viewItem == profile-stopped",
+          "group": "inline"
+        },
+        {
+          "command": "colima.profile.stop",
+          "when": "view == colima.profiles && viewItem == profile-running",
+          "group": "inline"
+        },
+        {
+          "command": "colima.profile.restart",
+          "when": "view == colima.profiles && viewItem == profile-running",
+          "group": "inline"
+        },
+        {
+          "command": "colima.profile.ssh",
+          "when": "view == colima.profiles && viewItem == profile-running",
+          "group": "inline"
+        },
+        {
+          "command": "colima.profile.start",
+          "when": "view == colima.profiles && viewItem == profile-stopped",
+          "group": "1_profile@1"
+        },
+        {
+          "command": "colima.profile.stop",
+          "when": "view == colima.profiles && viewItem == profile-running",
+          "group": "1_profile@2"
+        },
+        {
+          "command": "colima.profile.restart",
+          "when": "view == colima.profiles && viewItem == profile-running",
+          "group": "1_profile@3"
+        },
+        {
+          "command": "colima.profile.ssh",
+          "when": "view == colima.profiles && viewItem == profile-running",
+          "group": "1_profile@4"
+        },
+        {
+          "command": "colima.profile.attach",
+          "when": "view == colima.profiles && viewItem == profile-running",
+          "group": "1_profile@5"
+        },
+        {
+          "command": "colima.profile.status",
+          "when": "view == colima.profiles && viewItem =~ /profile-/",
+          "group": "2_info@1"
+        },
+        {
+          "command": "colima.profile.configEdit",
+          "when": "view == colima.profiles && viewItem =~ /profile-/",
+          "group": "2_info@2"
+        },
+        {
+          "command": "colima.profile.configVisualEdit",
+          "when": "view == colima.profiles && viewItem =~ /profile-/",
+          "group": "2_info@3"
+        },
+        {
+          "command": "colima.profile.delete",
+          "when": "view == colima.profiles && viewItem =~ /profile-/",
+          "group": "3_danger@1"
+        },
+        {
+          "command": "colima.container.stop",
+          "when": "view == colima.containers && viewItem == container-running",
+          "group": "inline"
+        },
+        {
+          "command": "colima.container.restart",
+          "when": "view == colima.containers && viewItem == container-running",
+          "group": "inline"
+        },
+        {
+          "command": "colima.container.logs",
+          "when": "view == colima.containers && viewItem == container-running",
+          "group": "1_container@1"
+        },
+        {
+          "command": "colima.container.exec",
+          "when": "view == colima.containers && viewItem == container-running",
+          "group": "1_container@2"
+        },
+        {
+          "command": "colima.container.inspect",
+          "when": "view == colima.containers && viewItem == container-running",
+          "group": "1_container@3"
+        },
+        {
+          "command": "colima.container.stop",
+          "when": "view == colima.containers && viewItem == container-running",
+          "group": "2_container@1"
+        },
+        {
+          "command": "colima.container.restart",
+          "when": "view == colima.containers && viewItem == container-running",
+          "group": "2_container@2"
+        },
+        {
+          "command": "colima.container.remove",
+          "when": "view == colima.containers && viewItem == container-running",
+          "group": "3_danger@1"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "colima.start",
+        "title": "Colima: Start",
+        "icon": "$(play)"
+      },
+      {
+        "command": "colima.start.quick",
+        "title": "Colima: Quick Start"
+      },
+      {
+        "command": "colima.start.preset.dev",
+        "title": "Colima: Start (Development Preset)"
+      },
+      {
+        "command": "colima.start.preset.k8s",
+        "title": "Colima: Start (Kubernetes Preset)"
+      },
+      {
+        "command": "colima.start.preset.containerd",
+        "title": "Colima: Start (Containerd Preset)"
+      },
+      {
+        "command": "colima.start.preset.ai",
+        "title": "Colima: Start (AI Workload Preset)"
+      },
+      {
+        "command": "colima.stop",
+        "title": "Colima: Stop",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "colima.restart",
+        "title": "Colima: Restart",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "colima.delete",
+        "title": "Colima: Delete Instance"
+      },
+      {
+        "command": "colima.status",
+        "title": "Colima: Show Status"
+      },
+      {
+        "command": "colima.ssh",
+        "title": "Colima: SSH into VM",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "colima.sshConfig",
+        "title": "Colima: Show SSH Config"
+      },
+      {
+        "command": "colima.profile.create",
+        "title": "Colima: Create Profile",
+        "icon": "$(add)"
+      },
+      {
+        "command": "colima.profile.switch",
+        "title": "Colima: Switch Profile"
+      },
+      {
+        "command": "colima.profile.start",
+        "title": "Colima: Start Profile",
+        "icon": "$(play)"
+      },
+      {
+        "command": "colima.profile.stop",
+        "title": "Colima: Stop Profile",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "colima.profile.restart",
+        "title": "Colima: Restart Profile",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "colima.profile.delete",
+        "title": "Colima: Delete Profile"
+      },
+      {
+        "command": "colima.profile.ssh",
+        "title": "Colima: SSH into Profile",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "colima.profile.status",
+        "title": "Colima: Show Profile Status"
+      },
+      {
+        "command": "colima.profile.configEdit",
+        "title": "Colima: Edit Configuration (YAML)"
+      },
+      {
+        "command": "colima.profile.configVisualEdit",
+        "title": "Colima: Visual Configuration Editor"
+      },
+      {
+        "command": "colima.config.edit",
+        "title": "Colima: Edit Default Configuration"
+      },
+      {
+        "command": "colima.config.editTemplate",
+        "title": "Colima: Edit Configuration Template"
+      },
+      {
+        "command": "colima.kubernetes.start",
+        "title": "Colima: Start Kubernetes"
+      },
+      {
+        "command": "colima.kubernetes.stop",
+        "title": "Colima: Stop Kubernetes"
+      },
+      {
+        "command": "colima.kubernetes.reset",
+        "title": "Colima: Reset Kubernetes"
+      },
+      {
+        "command": "colima.kubernetes.delete",
+        "title": "Colima: Delete Kubernetes"
+      },
+      {
+        "command": "colima.model.list",
+        "title": "Colima: List AI Models"
+      },
+      {
+        "command": "colima.model.pull",
+        "title": "Colima: Pull AI Model",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "colima.model.run",
+        "title": "Colima: Run AI Model"
+      },
+      {
+        "command": "colima.model.serve",
+        "title": "Colima: Serve AI Model"
+      },
+      {
+        "command": "colima.model.setup",
+        "title": "Colima: Setup AI Models"
+      },
+      {
+        "command": "colima.update",
+        "title": "Colima: Update Container Runtime"
+      },
+      {
+        "command": "colima.prune",
+        "title": "Colima: Prune Cache"
+      },
+      {
+        "command": "colima.openTerminal",
+        "title": "Colima: Open Docker Terminal"
+      },
+      {
+        "command": "colima.refresh",
+        "title": "Colima: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "colima.openDockerContext",
+        "title": "Colima: Show Docker Context"
+      },
+      {
+        "command": "colima.attach",
+        "title": "Colima: Attach to VS Code",
+        "icon": "$(remote)"
+      },
+      {
+        "command": "colima.profile.attach",
+        "title": "Colima: Attach Profile to VS Code",
+        "icon": "$(remote)"
+      },
+      {
+        "command": "colima.container.stop",
+        "title": "Colima: Stop Container",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "colima.container.restart",
+        "title": "Colima: Restart Container",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "colima.container.remove",
+        "title": "Colima: Remove Container"
+      },
+      {
+        "command": "colima.container.logs",
+        "title": "Colima: Container Logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "colima.container.exec",
+        "title": "Colima: Exec into Container",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "colima.container.inspect",
+        "title": "Colima: Inspect Container"
+      },
+      {
+        "command": "colima.install",
+        "title": "Colima: Install Colima",
+        "icon": "$(cloud-download)"
+      }
+    ],
+    "configuration": {
+      "title": "Colima",
+      "properties": {
+        "colima.colimaPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the colima binary. Leave empty to auto-detect from PATH."
+        },
+        "colima.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh Colima status and tree views."
+        },
+        "colima.refreshInterval": {
+          "type": "number",
+          "default": 10,
+          "minimum": 5,
+          "maximum": 120,
+          "description": "Interval in seconds for auto-refreshing Colima status."
+        },
+        "colima.defaultProfile": {
+          "type": "string",
+          "default": "default",
+          "description": "The default Colima profile to use."
+        },
+        "colima.showStatusBarItem": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Colima status bar item."
+        },
+        "colima.verboseLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable verbose logging in the Colima output channel."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "colima.start.quick",
+        "key": "ctrl+shift+c s",
+        "mac": "cmd+shift+c s"
+      },
+      {
+        "command": "colima.stop",
+        "key": "ctrl+shift+c x",
+        "mac": "cmd+shift+c x"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "lint": "eslint src --ext ts",
+    "test": "node ./dist/test/runTest.js",
+    "package": "npx vsce package"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.74.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-electron": "^2.3.8",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "mocha": "^10.3.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "glob": "^13.0.6"
+  }
+}
