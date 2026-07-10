@@ -1,4 +1,4 @@
-# 🐳 Colima for VS Code
+# 🐳 Colima — Docker Desktop Alternative for VS Code
 
 **[English](#english) | [中文](#中文)**
 
@@ -8,7 +8,7 @@
 
 ## English
 
-> **The easiest way to manage Colima container runtimes — right from your editor. Works on macOS, Linux, and Windows (via WSL).**
+> **The free, open-source Docker Desktop alternative for macOS. Manage Colima container runtimes, Docker, Kubernetes, and AI models — all from VS Code. Also works with Linux and Windows (WSL).**
 
 [Colima](https://github.com/abiosoft/colima) provides container runtimes on macOS and Linux with minimal setup. This extension brings Colima's full power into VS Code with a beautiful, intuitive GUI — no more memorizing CLI commands.
 
