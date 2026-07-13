@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import { logger } from '../utils/logger';
+import { runCommand } from '../utils/commandRunner';
 import type { ColimaClient } from '../colima/colimaClient';
 
 export function registerInstallCommand(
@@ -23,35 +21,24 @@ export function registerInstallCommand(
 }
 
 /**
- * Check if a binary exists by trying common paths and PATH.
+ * Check if a command exists by running it with --version.
  */
-function findBinary(name: string): string | null {
-  const platform = process.platform;
-  const paths: string[] = [];
-
-  if (platform === 'darwin') {
-    paths.push('/opt/homebrew/bin/' + name, '/usr/local/bin/' + name);
-  } else if (platform === 'linux') {
-    paths.push('/home/linuxbrew/.linuxbrew/bin/' + name, '/usr/local/bin/' + name, '/usr/bin/' + name);
+async function commandExists(cmd: string): Promise<boolean> {
+  try {
+    const result = await runCommand(cmd, ['--version'], { timeout: 10000 });
+    return result.exitCode === 0;
+  } catch {
+    return false;
   }
-  // For Windows, wsl.exe is in System32 which is always in PATH
-  paths.push(name);
-
-  for (const p of paths) {
-    if (p === name) return name; // Trust PATH
-    try {
-      fs.accessSync(p, fs.constants.X_OK);
-      return p;
-    } catch { /* not found */ }
-  }
-  return null;
 }
 
 /**
- * Get the official binary download command for the current platform.
- * Based on https://colima.run/docs/installation/
+ * Get the official binary download commands for the current platform.
+ * Returns an array of commands to run sequentially in the terminal.
+ * Split into separate commands to avoid sudo password corrupting && chains.
+ * Based on https://colima.run/docs/installation/#manual-installation
  */
-function getBinaryDownloadCmd(platform: string): string {
+function getBinaryDownloadCmds(platform: string): string[] {
   const arch = process.arch;
   let osName: string;
   let archName: string;
@@ -64,58 +51,97 @@ function getBinaryDownloadCmd(platform: string): string {
     archName = arch === 'arm64' ? 'aarch64' : 'x86_64';
   }
 
-  return `curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-${osName}-${archName} && sudo install colima-${osName}-${archName} /usr/local/bin/colima`;
+  const fileName = `colima-${osName}-${archName}`;
+  const url = `https://github.com/abiosoft/colima/releases/latest/download/${fileName}`;
+
+  // Split into separate terminal commands:
+  // 1. Download binary
+  // 2. Copy to /usr/local/bin (requires sudo)
+  // 3. Make executable (requires sudo)
+  // 4. Clean up
+  return [
+    `curl -LO ${url}`,
+    `sudo cp ${fileName} /usr/local/bin/colima`,
+    `sudo chmod +x /usr/local/bin/colima`,
+    `rm -f ${fileName}`,
+  ];
 }
 
 async function installColima(client: ColimaClient, refreshCallback: () => void): Promise<void> {
   const zh = vscode.env.language.startsWith('zh');
   const platform = process.platform;
 
-  let installCmd: string;
+  // installCmds: array of commands to run sequentially in the terminal
+  let installCmds: string[];
   let title: string;
 
   if (platform === 'darwin' || platform === 'linux') {
-    // macOS / Linux: check if Homebrew is installed
-    const brewPath = findBinary('brew');
-    if (brewPath) {
+    // macOS / Linux: check if Homebrew is actually working
+    // Run `brew --version` to verify
+    const brewWorking = await commandExists('brew');
+    if (brewWorking) {
       // Homebrew is available — use it (recommended method)
-      installCmd = `${brewPath} install colima docker`;
+      installCmds = ['brew install colima docker'];
       title = zh ? '安装 Colima (Homebrew)' : 'Install Colima (Homebrew)';
+      logger.info('Homebrew detected (brew --version succeeded), using brew install');
     } else {
-      // No Homebrew — use official binary download method
+      // No Homebrew — use official binary download
       // https://colima.run/docs/installation/#manual-installation
-      installCmd = getBinaryDownloadCmd(platform);
+      installCmds = getBinaryDownloadCmds(platform);
       title = zh ? '安装 Colima (官方二进制下载)' : 'Install Colima (Official Binary Download)';
+      logger.info('Homebrew not found (brew --version failed), using official binary download');
 
-      // Show a hint about Homebrew
       void vscode.window.showInformationMessage(
         zh
-          ? '未检测到 Homebrew，将使用官方二进制下载方式安装。如需更便捷的安装，可先安装 Homebrew: https://brew.sh'
-          : 'Homebrew not found, using official binary download. For easier installation, consider installing Homebrew: https://brew.sh',
+          ? '未检测到 Homebrew (brew --version 失败)，将使用官方二进制下载方式安装 Colima。'
+          : 'Homebrew not detected (brew --version failed), using official binary download to install Colima.',
       );
     }
   } else if (platform === 'win32') {
     // Windows: Colima requires WSL2
-    // Check if WSL is available
-    const wslPath = findBinary('wsl');
-    if (!wslPath) {
+    // Step 1: Check if WSL is available
+    const wslWorking = await commandExists('wsl');
+    if (!wslWorking) {
       // No WSL — Colima cannot run on Windows without WSL
       const msg = zh
         ? '⚠️ Colima 在 Windows 上需要 WSL2。\n\n请先安装 WSL2：\n1. 以管理员身份打开 PowerShell\n2. 运行: wsl --install\n3. 重启电脑\n4. 重新打开 VS Code 并再次点击安装\n\n详细教程: https://learn.microsoft.com/windows/wsl/install'
         : '⚠️ Colima requires WSL2 on Windows.\n\nTo install WSL2:\n1. Open PowerShell as Administrator\n2. Run: wsl --install\n3. Restart your computer\n4. Reopen VS Code and try again\n\nGuide: https://learn.microsoft.com/windows/wsl/install';
-      void vscode.window.showErrorMessage(msg, zh ? '打开教程' : 'Open Guide').then((choice) => {
-        if (choice) {
-          void vscode.env.openExternal(vscode.Uri.parse('https://learn.microsoft.com/windows/wsl/install'));
-        }
-      });
+      const action = zh ? '打开教程' : 'Open Guide';
+      const choice = await vscode.window.showErrorMessage(msg, action);
+      if (choice === action) {
+        await vscode.env.openExternal(vscode.Uri.parse('https://learn.microsoft.com/windows/wsl/install'));
+      }
       return;
     }
 
-    // WSL is available — check if Homebrew is installed inside WSL
-    // We can't easily check, so just try brew first, then binary download
+    // Step 2: WSL is available — check if Homebrew is installed inside WSL
+    // Run `wsl bash -c "command -v brew"` to check
+    const wslBrewResult = await runCommand('wsl', ['bash', '-c', 'command -v brew'], { timeout: 10000 });
+    const wslHasBrew = wslBrewResult.exitCode === 0 && wslBrewResult.stdout.trim().length > 0;
+
     title = zh ? '安装 Colima (WSL)' : 'Install Colima (WSL)';
-    // Use a compound command: try brew, if not found, use binary download
-    installCmd = `wsl bash -c "command -v brew >/dev/null 2>&1 && brew install colima docker || (curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-Linux-$(uname -m) && sudo install colima-Linux-$(uname -m) /usr/local/bin/colima)"`;
+
+    if (wslHasBrew) {
+      // Homebrew is available in WSL — use it
+      installCmds = ['wsl brew install colima docker'];
+      logger.info('WSL + Homebrew detected, using wsl brew install');
+    } else {
+      // No Homebrew in WSL — use binary download inside WSL
+      // Split into separate commands to avoid sudo password issues
+      installCmds = [
+        'wsl bash -c "curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-Linux-$(uname -m)"',
+        'wsl bash -c "sudo cp colima-Linux-$(uname -m) /usr/local/bin/colima"',
+        'wsl bash -c "sudo chmod +x /usr/local/bin/colima"',
+        'wsl bash -c "rm -f colima-Linux-$(uname -m)"',
+      ];
+      logger.info('WSL detected but no Homebrew, using binary download in WSL');
+
+      void vscode.window.showInformationMessage(
+        zh
+          ? 'WSL 中未检测到 Homebrew，将使用官方二进制下载方式在 WSL 中安装 Colima。'
+          : 'Homebrew not found in WSL, using official binary download inside WSL.',
+      );
+    }
   } else {
     void vscode.window.showErrorMessage(
       zh ? `不支持的平台: ${platform}` : `Unsupported platform: ${platform}`,
@@ -128,22 +154,33 @@ async function installColima(client: ColimaClient, refreshCallback: () => void):
     zh ? `Colima: 正在打开终端执行安装...` : `Colima: Opening terminal to install...`,
   );
 
-  // Open terminal and run install command
+  // Open terminal
   const terminal = vscode.window.createTerminal(title);
   terminal.show();
 
   // Small delay to ensure terminal is visible
-  await new Promise(resolve => setTimeout(resolve, 200));
+  await new Promise(resolve => setTimeout(resolve, 300));
 
-  // Run the install command
-  terminal.sendText(installCmd);
-  logger.info(`Installing Colima: ${installCmd}`);
+  // Run each command sequentially in the terminal
+  for (let i = 0; i < installCmds.length; i++) {
+    terminal.sendText(installCmds[i]);
+    logger.info(`Install step ${i + 1}/${installCmds.length}: ${installCmds[i]}`);
+
+    // If this is a sudo command, wait longer for password input
+    if (installCmds[i].includes('sudo')) {
+      // Wait for user to enter password and command to complete
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    } else {
+      // Short delay between non-sudo commands
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
 
   // Show notification
   void vscode.window.showInformationMessage(
     zh
-      ? `Colima: 安装命令已在终端执行。安装完成后请重新加载窗口。`
-      : `Colima: Install command is running in the terminal. Reload the window after installation completes.`,
+      ? `Colima: 安装命令已在终端执行 (${installCmds.length} 步)。安装完成后请重新加载窗口。`
+      : `Colima: Install commands are running in the terminal (${installCmds.length} steps). Reload the window after installation completes.`,
   );
 
   // Poll for completion every 5 seconds, up to 5 minutes

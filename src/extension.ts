@@ -49,9 +49,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (choice === (zh ? '一键安装' : 'Install Now')) {
       await vscode.commands.executeCommand('colima.install');
     } else if (choice === (zh ? '打开终端手动安装' : 'Open Terminal')) {
-      const terminal = vscode.window.createTerminal('Install Colima');
-      terminal.show();
-      terminal.sendText('brew install colima');
+      // Also use the install command which handles platform detection
+      await vscode.commands.executeCommand('colima.install');
     } else if (choice === (zh ? '设置路径' : 'Set Path')) {
       await vscode.commands.executeCommand('workbench.action.openSettings', 'colima.colimaPath');
     }
