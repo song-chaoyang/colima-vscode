@@ -2,7 +2,7 @@
   "name": "colima",
   "displayName": "Colima — Container Runtime Manager",
   "description": "Docker Desktop alternative for macOS. Manage Colima container runtimes with a GUI — start/stop, visual config, container/K8s/AI management, SSH attach. Replaces Docker Desktop, Podman, Rancher Desktop CLI. Works with VS Code, Cursor, Trae.",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "publisher": "song-chaoyang",
   "license": "MIT",
   "repository": {

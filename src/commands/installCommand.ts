@@ -54,17 +54,44 @@ function getBinaryDownloadCmds(platform: string): string[] {
   const fileName = `colima-${osName}-${archName}`;
   const url = `https://github.com/abiosoft/colima/releases/latest/download/${fileName}`;
 
-  // Split into separate terminal commands:
-  // 1. Download binary
-  // 2. Copy to /usr/local/bin (requires sudo)
-  // 3. Make executable (requires sudo)
-  // 4. Clean up
-  return [
+  // Determine the install directory:
+  // - Try /usr/local/bin first (standard, requires sudo)
+  // - If that doesn't exist, try /opt/homebrew/bin (Apple Silicon)
+  // - If neither exists, use ~/.local/bin (no sudo needed, usually in PATH)
+  const homeDir = require('os').homedir();
+  let installDir: string;
+  try {
+    require('fs').accessSync('/usr/local/bin', require('fs').constants.W_OK);
+    installDir = '/usr/local/bin';
+  } catch {
+    try {
+      require('fs').accessSync('/opt/homebrew/bin', require('fs').constants.W_OK);
+      installDir = '/opt/homebrew/bin';
+    } catch {
+      // Fallback: ~/.local/bin (create if needed, no sudo)
+      installDir = `${homeDir}/.local/bin`;
+    }
+  }
+
+  const needsSudo = installDir.startsWith('/usr/') || installDir.startsWith('/opt/');
+
+  const cmds: string[] = [
     `curl -LO ${url}`,
-    `sudo cp ${fileName} /usr/local/bin/colima`,
-    `sudo chmod +x /usr/local/bin/colima`,
-    `rm -f ${fileName}`,
   ];
+
+  if (needsSudo) {
+    cmds.push(`sudo mkdir -p ${installDir}`);
+    cmds.push(`sudo cp ${fileName} ${installDir}/colima`);
+    cmds.push(`sudo chmod +x ${installDir}/colima`);
+  } else {
+    cmds.push(`mkdir -p ${installDir}`);
+    cmds.push(`cp ${fileName} ${installDir}/colima`);
+    cmds.push(`chmod +x ${installDir}/colima`);
+  }
+
+  cmds.push(`rm -f ${fileName}`);
+
+  return cmds;
 }
 
 async function installColima(client: ColimaClient, refreshCallback: () => void): Promise<void> {
@@ -127,14 +154,12 @@ async function installColima(client: ColimaClient, refreshCallback: () => void):
       logger.info('WSL + Homebrew detected, using wsl brew install');
     } else {
       // No Homebrew in WSL — use binary download inside WSL
-      // Split into separate commands to avoid sudo password issues
+      // Use ~/.local/bin to avoid sudo issues, fallback to /usr/local/bin with sudo
       installCmds = [
         'wsl bash -c "curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-Linux-$(uname -m)"',
-        'wsl bash -c "sudo cp colima-Linux-$(uname -m) /usr/local/bin/colima"',
-        'wsl bash -c "sudo chmod +x /usr/local/bin/colima"',
-        'wsl bash -c "rm -f colima-Linux-$(uname -m)"',
+        'wsl bash -c "mkdir -p ~/.local/bin && cp colima-Linux-$(uname -m) ~/.local/bin/colima && chmod +x ~/.local/bin/colima && rm -f colima-Linux-$(uname -m)"',
       ];
-      logger.info('WSL detected but no Homebrew, using binary download in WSL');
+      logger.info('WSL detected but no Homebrew, using binary download in WSL (~/.local/bin)');
 
       void vscode.window.showInformationMessage(
         zh
