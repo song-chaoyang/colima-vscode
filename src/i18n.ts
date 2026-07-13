@@ -198,8 +198,8 @@ const messages: Record<string, Record<Locale, string>> = {
   'misc.showOutput': { en: 'Show Output', zh: '显示输出' },
   'misc.colimaNotRunning': { en: 'colima is not running', zh: 'colima 未运行' },
 
-  // Attach to VS Code
-  'attach.title': { en: 'Colima: Attach to VS Code', zh: 'Colima: 附加到 VS Code' },
+  // Attach to editor (dynamic editor name)
+  'attach.title': { en: 'Colima: Attach to Editor', zh: 'Colima: 附加到编辑器' },
   'attach.noRunningProfiles': { en: 'No running profiles found. Start Colima first.', zh: '没有运行中的实例。请先启动 Colima。' },
   'attach.selectProfile': { en: 'Select profile to attach', zh: '选择要附加的实例' },
   'attach.attaching': { en: 'Attaching to Colima VM...', zh: '正在附加到 Colima 虚拟机...' },
@@ -210,7 +210,7 @@ const messages: Record<string, Record<Locale, string>> = {
   'attach.needRemoteSSH': { en: 'Attaching requires the Remote-SSH extension. Install it now?', zh: '附加功能需要安装 Remote-SSH 扩展。是否立即安装？' },
   'attach.install': { en: 'Install', zh: '安装' },
   'attach.installed': { en: 'Remote-SSH installed. Please retry the attach action.', zh: 'Remote-SSH 已安装，请重新尝试附加操作。' },
-  'attach.failed': { en: 'Attach to VS Code', zh: '附加到 VS Code' },
+  'attach.failed': { en: 'Attach to Editor', zh: '附加到编辑器' },
 };
 
 export function t(key: string): string {

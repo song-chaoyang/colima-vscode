@@ -11,6 +11,20 @@ import { ProfileNode } from '../treeview/profilesTreeProvider';
 
 const SSH_CONFIG_PATH = path.join(os.homedir(), '.ssh', 'config');
 
+/**
+ * Detect the current editor name for display purposes.
+ * Returns "VS Code", "Cursor", "Trae", "Windsurf", etc.
+ */
+function getEditorName(): string {
+  const appName = vscode.env.appName || '';
+  if (appName.toLowerCase().includes('cursor')) return 'Cursor';
+  if (appName.toLowerCase().includes('trae')) return 'Trae';
+  if (appName.toLowerCase().includes('windsurf')) return 'Windsurf';
+  if (appName.toLowerCase().includes('vscodium')) return 'VSCodium';
+  if (appName.toLowerCase().includes('code')) return 'VS Code';
+  return appName || 'Editor';
+}
+
 export function registerAttachCommand(
   client: ColimaClient,
   _refreshCallback: () => void,
@@ -58,15 +72,22 @@ async function attachToVM(client: ColimaClient, profile?: string): Promise<void>
     }
     if (!remoteSSH) {
       const zh = vscode.env.language.startsWith('zh');
+      const editorName = getEditorName();
+      const needMsg = zh
+        ? `附加到 ${editorName} 需要安装 Remote-SSH 扩展。是否立即安装？`
+        : `Attaching to ${editorName} requires the Remote-SSH extension. Install it now?`;
       const choice = await vscode.window.showWarningMessage(
-        t('attach.needRemoteSSH'),
+        needMsg,
         t('attach.install'),
         zh ? '打开终端手动 SSH' : 'Open SSH Terminal Instead',
       );
       if (choice === t('attach.install')) {
         try {
           await vscode.commands.executeCommand('workbench.extensions.installExtension', 'ms-vscode-remote.remote-ssh');
-          void vscode.window.showInformationMessage(t('attach.installed'));
+        const installedMsg = zh
+          ? `Remote-SSH 已安装，请重新尝试附加到 ${editorName}。`
+          : `Remote-SSH installed. Please retry attaching to ${editorName}.`;
+          void vscode.window.showInformationMessage(installedMsg);
         } catch {
           void vscode.window.showErrorMessage(zh
             ? '无法安装 Remote-SSH 扩展，请手动安装后重试。'
@@ -119,7 +140,10 @@ async function attachToVM(client: ColimaClient, profile?: string): Promise<void>
       }
     });
   } catch (e) {
-    handleError(e, t('attach.failed'));
+    const zh = vscode.env.language.startsWith('zh');
+    const editorName = getEditorName();
+    const failMsg = zh ? `附加到 ${editorName}` : `Attach to ${editorName}`;
+    handleError(e, failMsg);
   }
 }
 

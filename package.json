@@ -2,7 +2,7 @@
   "name": "colima",
   "displayName": "Colima — Container Runtime Manager",
   "description": "Docker Desktop alternative for macOS. Manage Colima container runtimes with a GUI — start/stop, visual config, container/K8s/AI management, SSH attach. Replaces Docker Desktop, Podman, Rancher Desktop CLI. Works with VS Code, Cursor, Trae.",
-  "version": "0.2.4",
+  "version": "0.1.6",
   "publisher": "song-chaoyang",
   "license": "MIT",
   "repository": {
@@ -415,12 +415,12 @@
       },
       {
         "command": "colima.attach",
-        "title": "Colima: Attach to VS Code",
+        "title": "Colima: Attach to Editor",
         "icon": "$(remote)"
       },
       {
         "command": "colima.profile.attach",
-        "title": "Colima: Attach Profile to VS Code",
+        "title": "Colima: Attach Profile to Editor",
         "icon": "$(remote)"
       },
       {
@@ -521,6 +521,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
     "mocha": "^10.3.0",
