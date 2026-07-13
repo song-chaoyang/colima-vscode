@@ -23,7 +23,7 @@ export function registerInstallCommand(
 }
 
 /**
- * Check if a binary exists by trying common paths.
+ * Check if a binary exists by trying common paths and PATH.
  */
 function findBinary(name: string): string | null {
   const platform = process.platform;
@@ -33,10 +33,9 @@ function findBinary(name: string): string | null {
     paths.push('/opt/homebrew/bin/' + name, '/usr/local/bin/' + name);
   } else if (platform === 'linux') {
     paths.push('/home/linuxbrew/.linuxbrew/bin/' + name, '/usr/local/bin/' + name, '/usr/bin/' + name);
-  } else if (platform === 'win32') {
-    paths.push(path.join(os.homedir(), 'scoop', 'shims', name + '.exe'));
   }
-  paths.push(name); // Rely on PATH
+  // For Windows, wsl.exe is in System32 which is always in PATH
+  paths.push(name);
 
   for (const p of paths) {
     if (p === name) return name; // Trust PATH
@@ -48,51 +47,79 @@ function findBinary(name: string): string | null {
   return null;
 }
 
+/**
+ * Get the official binary download command for the current platform.
+ * Based on https://colima.run/docs/installation/
+ */
+function getBinaryDownloadCmd(platform: string): string {
+  const arch = process.arch;
+  let osName: string;
+  let archName: string;
+
+  if (platform === 'darwin') {
+    osName = 'Darwin';
+    archName = arch === 'arm64' ? 'arm64' : 'x86_64';
+  } else {
+    osName = 'Linux';
+    archName = arch === 'arm64' ? 'aarch64' : 'x86_64';
+  }
+
+  return `curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-${osName}-${archName} && sudo install colima-${osName}-${archName} /usr/local/bin/colima`;
+}
+
 async function installColima(client: ColimaClient, refreshCallback: () => void): Promise<void> {
   const zh = vscode.env.language.startsWith('zh');
   const platform = process.platform;
 
-  // Determine install command based on platform
   let installCmd: string;
   let title: string;
 
   if (platform === 'darwin' || platform === 'linux') {
-    // Check if Homebrew is available
+    // macOS / Linux: check if Homebrew is installed
     const brewPath = findBinary('brew');
     if (brewPath) {
+      // Homebrew is available — use it (recommended method)
       installCmd = `${brewPath} install colima docker`;
       title = zh ? '安装 Colima (Homebrew)' : 'Install Colima (Homebrew)';
     } else {
-      // Use binary download — official method from colima.run/docs/installation
-      const arch = process.arch;
-      let osName: string;
-      let archName: string;
-      if (platform === 'darwin') {
-        osName = 'Darwin';
-        archName = arch === 'arm64' ? 'arm64' : 'x86_64';
-      } else {
-        osName = 'Linux';
-        archName = arch === 'arm64' ? 'aarch64' : 'x86_64';
-      }
-      installCmd = `curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-${osName}-${archName} && sudo install colima-${osName}-${archName} /usr/local/bin/colima`;
-      title = zh ? '安装 Colima (二进制下载)' : 'Install Colima (Binary Download)';
+      // No Homebrew — use official binary download method
+      // https://colima.run/docs/installation/#manual-installation
+      installCmd = getBinaryDownloadCmd(platform);
+      title = zh ? '安装 Colima (官方二进制下载)' : 'Install Colima (Official Binary Download)';
+
+      // Show a hint about Homebrew
+      void vscode.window.showInformationMessage(
+        zh
+          ? '未检测到 Homebrew，将使用官方二进制下载方式安装。如需更便捷的安装，可先安装 Homebrew: https://brew.sh'
+          : 'Homebrew not found, using official binary download. For easier installation, consider installing Homebrew: https://brew.sh',
+      );
     }
   } else if (platform === 'win32') {
+    // Windows: Colima requires WSL2
+    // Check if WSL is available
     const wslPath = findBinary('wsl');
-    if (wslPath) {
-      installCmd = `${wslPath} brew install colima docker`;
-      title = zh ? '安装 Colima (WSL)' : 'Install Colima (WSL)';
-    } else {
-      void vscode.window.showErrorMessage(
-        zh
-          ? 'Windows 上需要先安装 WSL2。请运行: wsl --install，然后重启后再试。'
-          : 'WSL2 is required on Windows. Run: wsl --install, then restart and retry.',
-      );
-      await vscode.env.openExternal(vscode.Uri.parse('https://learn.microsoft.com/windows/wsl/install'));
+    if (!wslPath) {
+      // No WSL — Colima cannot run on Windows without WSL
+      const msg = zh
+        ? '⚠️ Colima 在 Windows 上需要 WSL2。\n\n请先安装 WSL2：\n1. 以管理员身份打开 PowerShell\n2. 运行: wsl --install\n3. 重启电脑\n4. 重新打开 VS Code 并再次点击安装\n\n详细教程: https://learn.microsoft.com/windows/wsl/install'
+        : '⚠️ Colima requires WSL2 on Windows.\n\nTo install WSL2:\n1. Open PowerShell as Administrator\n2. Run: wsl --install\n3. Restart your computer\n4. Reopen VS Code and try again\n\nGuide: https://learn.microsoft.com/windows/wsl/install';
+      void vscode.window.showErrorMessage(msg, zh ? '打开教程' : 'Open Guide').then((choice) => {
+        if (choice) {
+          void vscode.env.openExternal(vscode.Uri.parse('https://learn.microsoft.com/windows/wsl/install'));
+        }
+      });
       return;
     }
+
+    // WSL is available — check if Homebrew is installed inside WSL
+    // We can't easily check, so just try brew first, then binary download
+    title = zh ? '安装 Colima (WSL)' : 'Install Colima (WSL)';
+    // Use a compound command: try brew, if not found, use binary download
+    installCmd = `wsl bash -c "command -v brew >/dev/null 2>&1 && brew install colima docker || (curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-Linux-$(uname -m) && sudo install colima-Linux-$(uname -m) /usr/local/bin/colima)"`;
   } else {
-    void vscode.window.showErrorMessage(`Unsupported platform: ${platform}`);
+    void vscode.window.showErrorMessage(
+      zh ? `不支持的平台: ${platform}` : `Unsupported platform: ${platform}`,
+    );
     return;
   }
 
