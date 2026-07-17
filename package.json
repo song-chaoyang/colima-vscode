@@ -2,7 +2,7 @@
   "name": "colima-manager",
   "displayName": "Colima Manager",
   "description": "Docker Desktop alternative for macOS. Manage Colima container runtimes with a GUI — start/stop, visual config, container/K8s/AI management, SSH attach. Replaces Docker Desktop, Podman, Rancher Desktop CLI. Works with VS Code, Cursor, Trae.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "song-chaoyang",
   "license": "MIT",
   "repository": {
@@ -51,6 +51,9 @@
   ],
   "icon": "resources/icons/colima-logo.png",
   "main": "./dist/extension.js",
+  "extensionKind": [
+    "ui"
+  ],
   "activationEvents": [
     "onStartupFinished"
   ],
