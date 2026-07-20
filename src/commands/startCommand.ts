@@ -4,6 +4,8 @@ import type { StartOptions } from '../types';
 import { PRESETS } from '../constants';
 import { t } from '../i18n';
 import { handleError, withProgress } from '../utils/errorHandler';
+import { logger } from '../utils/logger';
+import { runCommand } from '../utils/commandRunner';
 import type { StartWizard } from '../webview/startWizard';
 
 export function registerStartCommands(
@@ -45,11 +47,19 @@ async function startWithPreset(
   refreshCallback: () => void,
 ): Promise<void> {
   try {
+    // Resolve 'auto' runtime: docker if available, otherwise containerd
+    let runtime = preset.runtime;
+    if (runtime === 'auto') {
+      const dockerCheck = await runCommand('docker', ['--version'], { timeout: 5000 });
+      runtime = dockerCheck.exitCode === 0 ? 'docker' : 'containerd';
+      logger.info(`Auto runtime resolved to: ${runtime} (docker ${dockerCheck.exitCode === 0 ? 'found' : 'not found'})`);
+    }
+
     const options: StartOptions = {
       cpu: preset.cpu,
       memory: preset.memory,
       disk: preset.disk,
-      runtime: preset.runtime as StartOptions['runtime'],
+      runtime: runtime as StartOptions['runtime'],
       kubernetes: preset.kubernetes ?? false,
       vmType: preset.vmType as StartOptions['vmType'],
     };

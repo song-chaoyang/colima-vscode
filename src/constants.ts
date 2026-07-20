@@ -81,11 +81,11 @@ export const OUTPUT_CHANNEL_NAME = 'Colima';
 export const STATUS_BAR_PRIORITY = 100;
 
 // Default presets for quick-start
-// NOTE: kubernetes must be explicitly false to override any existing config that has it enabled
+// runtime: 'auto' means detect at runtime — use docker if available, else containerd
 export const PRESETS = {
-  quick: { cpu: 2, memory: 2, disk: 100, runtime: 'docker' as const, kubernetes: false },
-  dev: { cpu: 4, memory: 8, disk: 100, runtime: 'docker' as const, kubernetes: false },
-  k8s: { cpu: 4, memory: 8, disk: 100, runtime: 'docker' as const, kubernetes: true },
+  quick: { cpu: 2, memory: 2, disk: 100, runtime: 'auto' as const, kubernetes: false },
+  dev: { cpu: 4, memory: 8, disk: 100, runtime: 'auto' as const, kubernetes: false },
+  k8s: { cpu: 4, memory: 8, disk: 100, runtime: 'auto' as const, kubernetes: true },
   containerd: { cpu: 2, memory: 2, disk: 100, runtime: 'containerd' as const, kubernetes: false },
-  ai: { cpu: 4, memory: 8, disk: 100, runtime: 'docker' as const, kubernetes: false, vmType: 'vz' as const },
+  ai: { cpu: 4, memory: 8, disk: 100, runtime: 'auto' as const, kubernetes: false, vmType: 'vz' as const },
 } as const;
