@@ -221,9 +221,86 @@ async function installColima(client: ColimaClient, refreshCallback: () => void):
           zh ? '✅ Colima 安装成功！' : '✅ Colima installed successfully!',
         );
         refreshCallback();
+
+        // Check if Docker CLI is also installed (required for docker runtime)
+        const dockerInstalled = await commandExists('docker');
+        if (!dockerInstalled) {
+          const msg = zh
+            ? '检测到未安装 Docker CLI。Colima 的 docker 运行时需要 Docker 命令行工具。是否现在安装？'
+            : 'Docker CLI not detected. Colima docker runtime requires the docker command-line tool. Install now?';
+          const action = zh ? '安装 Docker CLI' : 'Install Docker CLI';
+          const choice = await vscode.window.showWarningMessage(msg, action);
+          if (choice === action) {
+            await installDockerCli(platform, zh);
+          }
+        }
       } else if (attempts >= 60) {
         clearInterval(interval);
       }
     } catch { /* ignore */ }
   }, 5000);
+}
+
+/**
+ * Install Docker CLI on the current platform.
+ * macOS/Linux: brew install docker, or binary download from docker.com
+ */
+async function installDockerCli(platform: string, zh: boolean): Promise<void> {
+  let cmds: string[];
+  let title: string;
+
+  if (platform === 'darwin' || platform === 'linux') {
+    const brewWorking = await commandExists('brew');
+    if (brewWorking) {
+      cmds = ['brew install docker'];
+      title = zh ? '安装 Docker CLI (Homebrew)' : 'Install Docker CLI (Homebrew)';
+    } else {
+      // Download Docker CLI binary from docker.com
+      const arch = process.arch;
+      let dockerArch: string;
+      if (platform === 'darwin') {
+        dockerArch = arch === 'arm64' ? 'aarch64' : 'x86_64';
+      } else {
+        dockerArch = arch === 'arm64' ? 'aarch64' : 'x86_64';
+      }
+
+      // Get latest Docker version
+      cmds = [
+        `curl -fsSL https://download.docker.com/${platform === 'darwin' ? 'mac' : 'linux'}/static/stable/${dockerArch}/docker-28.0.0.tgz -o docker.tgz`,
+        `tar xzf docker.tgz`,
+        `mkdir -p ~/.local/bin && cp docker/docker ~/.local/bin/ && chmod +x ~/.local/bin/docker`,
+        `rm -rf docker docker.tgz`,
+      ];
+      title = zh ? '安装 Docker CLI (二进制下载)' : 'Install Docker CLI (Binary Download)';
+    }
+  } else if (platform === 'win32') {
+    cmds = ['wsl bash -c "command -v brew >/dev/null 2>&1 && brew install docker || (curl -fsSL https://download.docker.com/linux/static/stable/$(uname -m)/docker-28.0.0.tgz -o docker.tgz && tar xzf docker.tgz && mkdir -p ~/.local/bin && cp docker/docker ~/.local/bin/ && chmod +x ~/.local/bin/docker && rm -rf docker docker.tgz)"'];
+    title = zh ? '安装 Docker CLI (WSL)' : 'Install Docker CLI (WSL)';
+  } else {
+    return;
+  }
+
+  void vscode.window.showInformationMessage(
+    zh ? `Colima: 正在打开终端安装 Docker CLI...` : `Colima: Opening terminal to install Docker CLI...`,
+  );
+
+  const terminal = vscode.window.createTerminal(title);
+  terminal.show();
+  await new Promise(resolve => setTimeout(resolve, 300));
+
+  for (let i = 0; i < cmds.length; i++) {
+    terminal.sendText(cmds[i]);
+    logger.info(`Docker CLI install step ${i + 1}/${cmds.length}: ${cmds[i]}`);
+    if (cmds[i].includes('sudo')) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+  }
+
+  void vscode.window.showInformationMessage(
+    zh
+      ? `Colima: Docker CLI 安装命令已在终端执行。安装完成后请重新加载窗口。`
+      : `Colima: Docker CLI install commands are running in the terminal. Reload the window after installation completes.`,
+  );
 }

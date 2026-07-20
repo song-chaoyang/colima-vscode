@@ -75,7 +75,29 @@ async function startWithPreset(
     void vscode.window.showInformationMessage(`${t('notify.started')} (${label})`);
     refreshCallback();
   } catch (e) {
-    handleError(e, `${t('notify.startFailed')} (${label})`);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    if (errMsg.includes('docker not found') || errMsg.includes('dependency check failed for docker')) {
+      const zh = vscode.env.language.startsWith('zh');
+      const actionInstall = zh ? '安装 Docker CLI' : 'Install Docker CLI';
+      const actionContainerd = zh ? '使用 Containerd 运行时' : 'Use Containerd Runtime';
+      const choice = await vscode.window.showErrorMessage(
+        zh
+          ? 'Colima 的 docker 运行时需要 Docker CLI。\n\n你可以：\n1. 安装 Docker CLI 后再启动\n2. 使用 Containerd 运行时（不需要 Docker CLI）'
+          : 'Colima docker runtime requires the Docker CLI.\n\nYou can:\n1. Install Docker CLI and try again\n2. Use Containerd runtime (no Docker CLI needed)',
+        actionInstall,
+        actionContainerd,
+      );
+      if (choice === actionInstall) {
+        // Call the install command which will detect missing docker and offer to install it
+        await vscode.commands.executeCommand('colima.install');
+      } else if (choice === actionContainerd) {
+        // Retry with containerd runtime
+        const containerdPreset = { ...preset, runtime: 'containerd' as const };
+        await startWithPreset(client, containerdPreset, label, refreshCallback);
+      }
+    } else {
+      handleError(e, `${t('notify.startFailed')} (${label})`);
+    }
   }
 }
 
