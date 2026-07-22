@@ -50,9 +50,38 @@ async function startWithPreset(
     // Resolve 'auto' runtime: docker if available, otherwise containerd
     let runtime = preset.runtime;
     if (runtime === 'auto') {
-      const dockerCheck = await runCommand('docker', ['--version'], { timeout: 5000 });
-      runtime = dockerCheck.exitCode === 0 ? 'docker' : 'containerd';
-      logger.info(`Auto runtime resolved to: ${runtime} (docker ${dockerCheck.exitCode === 0 ? 'found' : 'not found'})`);
+      let dockerFound = false;
+      try {
+        const dockerCheck = await runCommand('docker', ['--version'], { timeout: 5000 });
+        dockerFound = dockerCheck.exitCode === 0;
+      } catch {
+        dockerFound = false;
+      }
+      runtime = dockerFound ? 'docker' : 'containerd';
+      logger.info(`Auto runtime resolved to: ${runtime} (docker ${dockerFound ? 'found' : 'not found'})`);
+    }
+
+    // Resolve 'auto' vmType: krunkit if installed, otherwise vz
+    let vmType = preset.vmType;
+    if (vmType === 'auto') {
+      let krunkitFound = false;
+      try {
+        const krunkitCheck = await runCommand('krunkit', ['--version'], { timeout: 5000 });
+        krunkitFound = krunkitCheck.exitCode === 0;
+      } catch {
+        krunkitFound = false;
+      }
+      vmType = krunkitFound ? 'krunkit' : 'vz';
+      logger.info(`Auto vmType resolved to: ${vmType} (krunkit ${krunkitFound ? 'found' : 'not found'})`);
+
+      if (!krunkitFound) {
+        const zh = vscode.env.language.startsWith('zh');
+        void vscode.window.showInformationMessage(
+          zh
+            ? '未检测到 krunkit，AI 模型功能需要 krunkit 虚拟机类型。已使用 VZ 启动，如需使用 AI 模型请安装 krunkit: brew tap slp/krunkit && brew trust slp/krunkit && brew install krunkit'
+            : 'krunkit not found, using VZ instead. AI model features require krunkit. Install: brew tap slp/krunkit && brew trust slp/krunkit && brew install krunkit',
+        );
+      }
     }
 
     const options: StartOptions = {
@@ -61,7 +90,7 @@ async function startWithPreset(
       disk: preset.disk,
       runtime: runtime as StartOptions['runtime'],
       kubernetes: preset.kubernetes ?? false,
-      vmType: preset.vmType as StartOptions['vmType'],
+      vmType: vmType as StartOptions['vmType'],
     };
 
     await withProgress(`${t('progress.starting')} (${label})...`, async (report) => {
@@ -106,6 +135,35 @@ async function startWithPreset(
         await startWithPreset(client, containerdPreset, label, refreshCallback);
       }
     } else {
+      // Check for runtime disk conflict error
+      if (errMsg.includes('runtime disk provisioned for') && errMsg.includes('Delete container data')) {
+        const zh = vscode.env.language.startsWith('zh');
+        const actionClean = zh ? '清理并重试' : 'Clean & Retry';
+        const choice = await vscode.window.showErrorMessage(
+          zh
+            ? '检测到运行时冲突：之前的实例使用不同的运行时创建。\n\n点击"清理并重试"将自动删除旧数据并用新运行时重新创建。'
+            : 'Runtime conflict detected: previous instance was created with a different runtime.\n\nClick "Clean & Retry" to automatically delete old data and recreate with the new runtime.',
+          actionClean,
+        );
+        if (choice === actionClean) {
+          // Delete old instance data and retry
+          try {
+            const zh2 = vscode.env.language.startsWith('zh');
+            await withProgress(zh2 ? '正在清理旧数据...' : 'Cleaning old data...', async (report) => {
+              report(zh2 ? '停止实例...' : 'Stopping instance...');
+              await client.stop(undefined, true);
+              report(zh2 ? '删除数据...' : 'Deleting data...');
+              await client.delete(undefined, true, true);
+            });
+            // Retry start with the same preset
+            await startWithPreset(client, preset, label, refreshCallback);
+            return;
+          } catch (cleanErr) {
+            handleError(cleanErr, zh ? '清理失败' : 'Cleanup failed');
+            return;
+          }
+        }
+      }
       handleError(e, `${t('notify.startFailed')} (${label})`);
     }
   }
@@ -144,6 +202,40 @@ export async function startWithOptions(
   refreshCallback: () => void,
 ): Promise<void> {
   try {
+    // Resolve 'auto' runtime: docker if available, otherwise containerd
+    if ((options.runtime as string) === 'auto') {
+      let dockerFound = false;
+      try {
+        const dockerCheck = await runCommand('docker', ['--version'], { timeout: 5000 });
+        dockerFound = dockerCheck.exitCode === 0;
+      } catch {
+        dockerFound = false;
+      }
+      options.runtime = (dockerFound ? 'docker' : 'containerd') as StartOptions['runtime'];
+      logger.info(`Auto runtime resolved to: ${options.runtime} (docker ${dockerFound ? 'found' : 'not found'})`);
+    }
+
+    // Resolve 'auto' vmType: krunkit if installed, otherwise vz
+    if ((options.vmType as string) === 'auto') {
+      let krunkitFound = false;
+      try {
+        const krunkitCheck = await runCommand('krunkit', ['--version'], { timeout: 5000 });
+        krunkitFound = krunkitCheck.exitCode === 0;
+      } catch {
+        krunkitFound = false;
+      }
+      options.vmType = (krunkitFound ? 'krunkit' : 'vz') as StartOptions['vmType'];
+      logger.info(`Auto vmType resolved to: ${options.vmType} (krunkit ${krunkitFound ? 'found' : 'not found'})`);
+      if (!krunkitFound) {
+        const zh = vscode.env.language.startsWith('zh');
+        void vscode.window.showInformationMessage(
+          zh
+            ? '未检测到 krunkit，已使用 VZ 启动。AI 模型功能需要 krunkit: brew tap slp/krunkit && brew trust slp/krunkit && brew install krunkit'
+            : 'krunkit not found, using VZ. AI model features require krunkit: brew tap slp/krunkit && brew trust slp/krunkit && brew install krunkit',
+        );
+      }
+    }
+
     await withProgress(t('progress.starting'), async (report) => {
       await client.start(options, (output) => {
         const lines = output.split('\n').filter((l) => l.trim());

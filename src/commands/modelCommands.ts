@@ -102,10 +102,35 @@ async function checkKrunkitAvailable(client: ColimaClient): Promise<boolean> {
     const driver = status.driver.toLowerCase();
     if (!driver.includes('krunkit')) {
       const zh = vscode.env.language.startsWith('zh');
+
+      // First check if krunkit is even installed
+      const { runCommand } = await import('../utils/commandRunner');
+      let krunkitInstalled = false;
+      try {
+        const krunkitCheck = await runCommand('krunkit', ['--version'], { timeout: 5000 });
+        krunkitInstalled = krunkitCheck.exitCode === 0;
+      } catch { krunkitInstalled = false; }
+
+      if (!krunkitInstalled) {
+        // krunkit not installed — offer to install it first
+        const msg = zh
+          ? 'AI 模型功能需要 krunkit 虚拟机类型，但 krunkit 未安装。\n\n点击"安装 krunkit"在终端执行安装。\n安装后需要删除当前实例并用 krunkit 重新创建。'
+          : 'AI model features require krunkit VM type, but krunkit is not installed.\n\nClick "Install krunkit" to install it in terminal.\nAfter installation, delete current instance and recreate with krunkit.';
+        const actionInstall = zh ? '安装 krunkit' : 'Install krunkit';
+        const choice = await vscode.window.showWarningMessage(msg, { modal: true }, actionInstall);
+        if (choice === actionInstall) {
+          const terminal = vscode.window.createTerminal('Install krunkit');
+          terminal.show();
+          terminal.sendText('brew tap slp/krunkit && brew trust slp/krunkit && brew install krunkit');
+        }
+        return false;
+      }
+
+      // krunkit installed but VM not using it — offer to recreate
       const msg = zh
-        ? 'AI 模型功能需要 krunkit 虚拟机类型。\n\n虚拟机类型创建后不可更改，需要先删除再重建：\n\ncolima delete\ncolima start --runtime docker --vm-type krunkit\n\n⚠️ 删除会清除所有容器和镜像数据'
-        : 'AI model features require krunkit VM type.\n\nVM type is immutable after creation. You must delete and recreate:\n\ncolima delete\ncolima start --runtime docker --vm-type krunkit\n\n⚠️ Deleting will remove all container and image data';
-      const actionDelete = zh ? '删除并重建' : 'Delete & Recreate';
+        ? 'AI 模型功能需要 krunkit 虚拟机类型。\n\n当前 VM 使用的是 ' + status.driver + '，需要删除并重建。\n\n⚠️ 删除会清除所有容器和镜像数据'
+        : 'AI model features require krunkit VM type.\n\nCurrent VM uses ' + status.driver + ', need to delete and recreate.\n\n⚠️ Deleting will remove all container and image data';
+      const actionDelete = zh ? '删除并用 krunkit 重建' : 'Delete & Recreate with krunkit';
       const choice = await vscode.window.showWarningMessage(msg, { modal: true }, actionDelete);
       if (choice === actionDelete) {
         const terminal = vscode.window.createTerminal('Colima: Recreate with krunkit');

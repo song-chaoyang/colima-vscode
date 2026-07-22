@@ -87,5 +87,5 @@ export const PRESETS = {
   dev: { cpu: 4, memory: 8, disk: 100, runtime: 'auto' as const, kubernetes: false },
   k8s: { cpu: 4, memory: 8, disk: 100, runtime: 'auto' as const, kubernetes: true },
   containerd: { cpu: 2, memory: 2, disk: 100, runtime: 'containerd' as const, kubernetes: false },
-  ai: { cpu: 4, memory: 8, disk: 100, runtime: 'auto' as const, kubernetes: false, vmType: 'vz' as const },
+  ai: { cpu: 4, memory: 8, disk: 100, runtime: 'auto' as const, kubernetes: false, vmType: 'auto' as const },
 } as const;

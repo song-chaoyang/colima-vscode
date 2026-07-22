@@ -24,6 +24,21 @@ import { VIEW } from './constants';
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  // Check if running in any remote context — this extension is for local use only
+  // This includes Remote-SSH (ssh-remote+...), WSL (wsl), Dev Containers, etc.
+  const remoteAuthority = vscode.env.remoteName;
+  if (remoteAuthority) {
+    const zh = vscode.env.language.startsWith('zh');
+    logger.init(context);
+    logger.info(`Skipping activation in remote context: ${remoteAuthority}`);
+    void vscode.window.showInformationMessage(
+      zh
+        ? 'Colima Manager 是本地工具，请在本地编辑器窗口中使用。'
+        : 'Colima Manager is a local tool. Please use it from your local editor window.',
+    );
+    return;
+  }
+
   // Initialize i18n and logger
   initLocale();
   logger.init(context);

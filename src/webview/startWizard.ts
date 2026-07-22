@@ -48,11 +48,11 @@ export class StartWizard {
 
   private presetToOptions(preset: string, profile?: string): StartOptions {
     const presets: Record<string, StartOptions> = {
-      quick: { profile, cpu: 2, memory: 2, disk: 100, runtime: 'docker' },
-      dev: { profile, cpu: 4, memory: 8, disk: 100, runtime: 'docker' },
-      k8s: { profile, cpu: 4, memory: 8, disk: 100, runtime: 'docker', kubernetes: true },
+      quick: { profile, cpu: 2, memory: 2, disk: 100, runtime: 'auto' as any },
+      dev: { profile, cpu: 4, memory: 8, disk: 100, runtime: 'auto' as any },
+      k8s: { profile, cpu: 4, memory: 8, disk: 100, runtime: 'auto' as any, kubernetes: true },
       containerd: { profile, cpu: 2, memory: 2, disk: 100, runtime: 'containerd' },
-      ai: { profile, cpu: 4, memory: 8, disk: 100, runtime: 'docker', vmType: 'vz' },
+      ai: { profile, cpu: 4, memory: 8, disk: 100, runtime: 'auto' as any, vmType: 'auto' as any },
     };
     return presets[preset] ?? presets.quick;
   }

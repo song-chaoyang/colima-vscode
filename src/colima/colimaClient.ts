@@ -31,12 +31,30 @@ export class ColimaClient {
   }
 
   async isInstalled(): Promise<boolean> {
+    // Try the detected binary path first
     try {
       const result = await runCommand(this.binaryPath, ['version'], { timeout: 10000 });
-      return result.exitCode === 0;
-    } catch {
-      return false;
+      if (result.exitCode === 0) return true;
+    } catch { /* continue to fallbacks */ }
+
+    // Fallback: try common absolute paths (VS Code extension host PATH may differ from terminal)
+    const fallbackPaths = [
+      '/opt/homebrew/bin/colima',
+      '/usr/local/bin/colima',
+      '/usr/bin/colima',
+      '/home/linuxbrew/.linuxbrew/bin/colima',
+    ];
+    for (const p of fallbackPaths) {
+      try {
+        const result = await runCommand(p, ['version'], { timeout: 10000 });
+        if (result.exitCode === 0) {
+          this.binaryPath = p;
+          return true;
+        }
+      } catch { /* try next */ }
     }
+
+    return false;
   }
 
   async getVersion(): Promise<ColimaVersion> {

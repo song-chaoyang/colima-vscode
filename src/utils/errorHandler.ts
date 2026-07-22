@@ -9,7 +9,15 @@ export function handleError(error: unknown, context: string): void {
 
   if (error instanceof ColimaError) {
     if (error.code === 'ENOENT') {
-      message = t('notify.notInstalled');
+      // Check if it's colima or another command (like docker) that's not found
+      const notFoundMatch = error.message.match(/Command not found: (\S+)/);
+      const cmdName = notFoundMatch ? notFoundMatch[1] : 'colima';
+      if (cmdName === 'docker') {
+        message = `Docker CLI not found. Colima can use containerd runtime instead (no Docker CLI needed).`;
+        detail = error.message;
+      } else {
+        message = t('notify.notInstalled');
+      }
     } else {
       message = `${context}: ${error.message}`;
       detail = error.stderr || error.message;
